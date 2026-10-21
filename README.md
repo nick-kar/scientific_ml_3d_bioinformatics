@@ -1,141 +1,144 @@
-# Scientific ML: 3D Point Clouds & Biomedical Bioinformatics
+﻿# Scientific ML: 3D Point Clouds & Biomedical Bioinformatics
 
-A research-oriented machine learning project combining **3D geometric deep learning** and **high-dimensional biomedical classification** using PyTorch and scikit-learn.
+Two applied machine-learning pipelines exploring 3D geometric deep learning and biomedical gene-expression classification.
 
-## Project Overview
+## Projects
 
-This repository explores two distinct scientific ML tasks:
+### 1. 3D Point-Cloud Classification — ModelNet10
 
-### 1. 3D Point-Cloud Classification
+Implemented a lightweight PointNet-style classifier in PyTorch for classifying 3D objects from sampled mesh-surface points.
 
-A lightweight PointNet-style neural network for classifying 3D point clouds represented by XYZ coordinates.
+**Pipeline**
+- Load ModelNet10 `.off` meshes using `trimesh`.
+- Sample 512 points from each mesh surface.
+- Center and normalize each point cloud.
+- Encode point features with a shared multilayer perceptron and aggregate them using symmetric max pooling.
+- Train with cross-entropy loss and Adam; evaluate using accuracy, macro-F1, and per-class precision/recall/F1.
+- Preserve the dataset's official training and test split.
 
-**Implemented**
-- PyTorch point-cloud feature extraction
-- Symmetric max pooling for permutation-invariant global features
-- Classification head with dropout
-- Training and evaluation utilities
-- Input validation and automated tests
+**Full-split results**
 
-**Current status:** The model and utilities are implemented and tested. A real-dataset benchmark and corresponding performance results are not yet available.
+| Metric | Result |
+|---|---:|
+| Training objects | 3,991 |
+| Test objects | 908 |
+| Classes | 10 |
+| Points per object | 512 |
+| Training epochs | 15 |
+| Test accuracy | 84.36% |
+| Test macro-F1 | 0.8350 |
 
-### 2. Biomedical Gene-Expression Classification
+The experiment uses a single seed and a lightweight PointNet-style architecture. These results are from this implementation and configuration; they should not be interpreted as reproducing the original PointNet paper's benchmark.
 
-A three-class leukemia classification experiment using the Golub gene-expression dataset.
+### 2. Biomedical Gene-Expression Classification — Golub Dataset
 
-**Dataset characteristics**
-- 72 samples
-- 7,129 gene-expression features per sample
-- Three classes: `allB`, `allT`, and `aml`
-- No missing gene-expression values in the downloaded CSV
+Compared Logistic Regression and RBF-kernel SVM pipelines for classifying leukemia-related gene-expression profiles.
 
-**Models**
-- Logistic Regression with class balancing
-- RBF Support Vector Machine with class balancing
+**Pipeline**
+- Extract numeric gene-expression features from the dataset.
+- Split data using a stratified train/test split.
+- Standardize features and select up to 100 features using `SelectKBest` with an ANOVA F-test.
+- Train and compare Logistic Regression and RBF SVM classifiers with balanced class weights.
+- Evaluate with accuracy, macro-F1, and per-class metrics.
 
-**Methodology**
-- Stratified train/test split with a fixed random seed
-- Standardization and univariate feature selection inside scikit-learn pipelines
-- Feature selection restricted to the training data during fitting
-- Accuracy, macro-F1, per-class precision/recall/F1, and confusion matrices
-- JSON output for recorded evaluation results
+**Held-out results**
 
-## Initial Results
-
-Results from one stratified 75%/25% train/test split using `random_state=42`:
-
-| Metric | Logistic Regression | RBF SVM |
+| Model | Accuracy | Macro-F1 |
 |---|---:|---:|
-| Accuracy | 0.944 | 0.889 |
-| Macro-F1 | 0.957 | 0.871 |
-| Correct test predictions | 17/18 | 16/18 |
+| Logistic Regression | 94.4% | 0.957 |
+| RBF SVM | 88.9% | 0.871 |
 
-Logistic Regression performed better on this particular split.
+The test split contains only 18 samples, including just two `allT` samples. Results are therefore preliminary and sensitive to the split; they do not establish clinical validity or generalization to new patient populations.
 
-**Limitations:** The test set contains only 18 samples, including two `allT` samples. Performance estimates are therefore uncertain and may vary substantially across different splits. These preliminary results are not evidence of clinical readiness or guaranteed generalization to new populations.
-
-## Technology Stack
+## Tech Stack
 
 - Python
 - PyTorch
-- NumPy and pandas
 - scikit-learn
+- NumPy and pandas
+- trimesh
 - pytest
+- GitHub Actions
 
 ## Repository Structure
 
 ```text
-scientific_ml_3d_bioinformatics/
-├── assets/
-├── data/
-│   └── .gitkeep
-├── outputs/
+.
+├── .github/workflows/tests.yml
+├── data/                         # Local datasets; not tracked by Git
+├── outputs/                      # Local experiment results; not tracked by Git
 ├── src/
 │   ├── pointnet.py
-│   └── train_pointnet.py
+│   ├── train_pointnet.py
+│   ├── train_modelnet10.py
 │   └── train_gene_expression.py
 ├── tests/
 │   ├── test_pointnet.py
+│   ├── test_modelnet10.py
 │   └── test_gene_expression.py
-├── .gitignore
-├── README.md
-└── requirements.txt
+├── requirements.txt
+└── README.md
 ```
-
-The downloaded dataset and generated outputs are excluded from version control.
 
 ## Setup
 
-Install the dependencies in an existing Python environment:
+Use Python 3.9 or later.
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-Run the automated tests:
+### ModelNet10 data
 
-```bash
-python -m pytest -v
+Download ModelNet10 from the [official Princeton dataset page](https://modelnet.cs.princeton.edu/download.html) and extract it so the directory structure is:
+
+```text
+data/ModelNet10/ModelNet10/
+├── bathtub/
+│   ├── train/
+│   └── test/
+├── bed/
+├── chair/
+└── ... other categories
 ```
 
-## Run the Gene-Expression Experiment
+The extracted dataset is intentionally excluded from Git. Download and use the dataset in accordance with its original terms.
 
-Download the Golub CSV dataset from:
+Run the full 3D experiment:
 
-https://openintro.org/data/csv/golub.csv
+```bash
+python -m src.train_modelnet10 --points 512 --epochs 15 --batch-size 32 --output outputs/modelnet10_results.json
+```
 
-Save it as `data/golub.csv`, then run:
+Run a smaller pilot:
+
+```bash
+python -m src.train_modelnet10 --max-train-per-class 100 --max-test-per-class 20 --points 512 --epochs 10 --batch-size 16 --output outputs/modelnet10_pilot_results.json
+```
+
+### Gene-expression experiment
+
+Place the Golub CSV file at `data/golub.csv`, then run:
 
 ```bash
 python -m src.train_gene_expression
 ```
 
-The evaluation results are written to:
+The exact supported command-line options are defined in each script.
 
-```text
-outputs/gene_expression_results.json
+## Tests
+
+Run all automated tests:
+
+```bash
+python -m pytest -v
 ```
 
-## Testing
+The test suite covers model output and permutation invariance, data validation, gene-expression pipelines, mesh loading, point-cloud normalization, and reproducible sampling.
 
-The current test suite contains 10 passing tests covering:
-- PointNet output shapes and permutation invariance
-- Invalid point-cloud input handling
-- Data loading and evaluation utilities
-- Classifier pipeline construction and feature selection
-- Three-class model fitting and prediction on synthetic data
-- Numeric gene-expression feature extraction
+## Limitations
 
-Passing automated tests verifies the tested software behavior; it does not establish scientific validity or real-world model performance.
-
-## Future Work
-
-- Benchmark point-cloud classification on a documented public dataset
-- Add cross-validation and uncertainty-aware evaluation for gene-expression classification
-- Compare feature-selection strategies and model performance
-- Add reproducible experiment configurations and visualizations
-- Integrate continuous testing with GitHub Actions
-
-## Intended Use
-
-This repository is an educational and research portfolio project demonstrating scientific machine learning, model evaluation, and software testing. It is not a medical diagnostic system.
+- The 3D model is a compact PointNet-style baseline, not a reproduction of the full original architecture.
+- ModelNet10 results use one seed and one training configuration; no hyperparameter search or multi-seed confidence intervals were performed.
+- The gene-expression experiment uses a single small held-out test split. Cross-validation and external validation would be needed for stronger conclusions.
+- Neither pipeline is intended for clinical decision-making.
